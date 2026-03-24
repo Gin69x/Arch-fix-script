@@ -1,92 +1,140 @@
 #!/bin/bash
+# =============================================================================
+#  Arch System Recovery  \u00b7  Hyprland / Illogical Impulse Fix
+#  Run as your normal user:  bash arch-recovery.sh
+#  (sudo is called internally only where root is needed)
+# =============================================================================
+
 set -euo pipefail
 
-# ===== Colors =====
-RESET="\033[0m"
-BOLD="\033[1m"
-DIM="\033[2m"
-
-FG_RED="\033[38;5;196m"
-FG_GREEN="\033[38;5;46m"
-FG_BLUE="\033[38;5;33m"
-FG_CYAN="\033[38;5;51m"
-FG_GRAY="\033[38;5;240m"
-
-# ===== Layout =====
-WIDTH=$(tput cols 2>/dev/null || echo 80)
-
-line() {
-    printf "%${WIDTH}s\n" | tr ' ' '─'
-}
-
-center() {
-    printf "%*s\n" $(((${#1} + WIDTH) / 2)) "$1"
-}
-
-# ===== Status UI =====
-run_step() {
-    local msg="$1"
-    shift
-
-    printf "${FG_BLUE}→${RESET} %-50s ${FG_GRAY}...${RESET}" "$msg"
-
-    if "$@" &>/dev/null; then
-        printf "\r${FG_GREEN}✔${RESET} %-50s\n" "$msg"
-    else
-        printf "\r${FG_RED}✘${RESET} %-50s\n" "$msg"
-        exit 1
-    fi
-}
-
-# ===== Header =====
-clear
-echo -e "${FG_CYAN}${BOLD}"
-line
-center "ARCH SYSTEM RECOVERY"
-center "Hyprland / Illogical Impulse Fix"
-line
-echo -e "${RESET}"
-
-# ===== Checks =====
-run_step "Checking internet connection" ping -c 2 github.com
-
-# ===== System =====
-echo -e "\n${FG_CYAN}${BOLD}SYSTEM UPDATE${RESET}"
-run_step "Updating package database and system" pacman -Syyu --noconfirm
-
-# ===== Toolchain =====
-echo -e "\n${FG_CYAN}${BOLD}TOOLCHAIN REPAIR${RESET}"
-run_step "Reinstalling gcc, glibc, binutils" pacman -S --overwrite="*" --noconfirm gcc gcc-libs glibc binutils
-run_step "Installing base-devel, git, python, curl" pacman -S --needed --noconfirm base-devel git python curl
-
-# ===== Compiler Test =====
-echo -e "\n${FG_CYAN}${BOLD}COMPILER TEST${RESET}"
-
-echo 'int main(){}' > /tmp/test.c
-if cc /tmp/test.c -o /tmp/test &>/dev/null; then
-    echo -e "${FG_GREEN}✔ Compiler working${RESET}"
-else
-    echo -e "${FG_RED}✘ Compiler broken${RESET}"
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  Privilege guard  \u2014  must NOT be root (makepkg refuses to run as root)
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+if [[ $EUID -eq 0 ]]; then
+    echo "\u2718  Do not run this script as root / sudo."
+    echo "   Run it as your normal user:  bash arch-recovery.sh"
     exit 1
 fi
-rm -f /tmp/test.c /tmp/test
 
-# ===== AUR =====
-echo -e "\n${FG_CYAN}${BOLD}AUR INSTALLATION${RESET}"
+# Pre-cache sudo credentials so pacman calls don't stall mid-script
+if ! sudo -v 2>/dev/null; then
+    echo "\u2718  sudo access is required for pacman. Aborting."
+    exit 1
+fi
 
-run_step "Cleaning previous builds" rm -rf /tmp/illogical-impulse-dots /tmp/wlogout
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  Colour palette (256-colour ANSI)
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+R=$'\033[0m'
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
 
-run_step "Cloning Illogical Impulse Dots" git clone https://aur.archlinux.org/illogical-impulse-dots.git /tmp/illogical-impulse-dots
-run_step "Building Illogical Impulse Dots" bash -c "cd /tmp/illogical-impulse-dots && makepkg -si --noconfirm"
+C_CYAN=$'\033[38;5;51m'
+C_BLUE=$'\033[38;5;39m'
+C_GREEN=$'\033[38;5;82m'
+C_RED=$'\033[38;5;196m'
+C_YELLOW=$'\033[38;5;220m'
+C_PURPLE=$'\033[38;5;141m'
+C_GRAY=$'\033[38;5;245m'
+C_WHITE=$'\033[38;5;255m'
+BG_DARK=$'\033[48;5;234m'
 
-run_step "Cloning wlogout" git clone https://aur.archlinux.org/wlogout.git /tmp/wlogout
-run_step "Building wlogout" bash -c "cd /tmp/wlogout && makepkg -si --noconfirm"
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  Terminal geometry
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+COLS=$(tput cols 2>/dev/null || echo 80)
 
-# ===== Done =====
-echo -e "\n${FG_GREEN}${BOLD}"
-line
-center "RECOVERY COMPLETE"
-line
-echo -e "${RESET}"
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  Layout helpers
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+repeat_char() { printf "%${2}s" | tr ' ' "${1}"; }
 
-echo -e "${DIM}System repaired. Reboot when ready.${RESET}"Q
+hline()      { echo -e "${C_CYAN}$(repeat_char '\u2501' "$COLS")${R}"; }
+hline_thin() { echo -e "${C_GRAY}$(repeat_char '\u2500' "$COLS")${R}"; }
+
+center() {
+    local text="$1"
+    local bare
+    bare=$(printf '%s' "$text" | sed 's/\x1B\[[0-9;]*m//g')
+    local pad=$(( (COLS - ${#bare}) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    printf "%${pad}s%s\n" "" "$text"
+}
+
+section() {
+    local title="$1"
+    local bar_width=$(( COLS - ${#title} - 7 ))
+    [[ $bar_width -lt 1 ]] && bar_width=1
+    echo ""
+    echo -e "${BG_DARK}${C_CYAN}${BOLD}  \u25c6 ${C_WHITE}${title}  ${C_CYAN}$(repeat_char '\u00b7' "$bar_width") ${R}"
+}
+
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  Braille spinner  (non-blocking background process)
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+SPIN_FRAMES=("\u280b" "\u2819" "\u2839" "\u2838" "\u283c" "\u2834" "\u2826" "\u2827" "\u2807" "\u280f")
+_SPIN_PID=""
+
+_spin_start() {
+    local msg="$1"
+    (
+        local i=0
+        while true; do
+            local f="${SPIN_FRAMES[$((i % ${#SPIN_FRAMES[@]}))]}"
+            printf "\r    ${C_CYAN}${f}${R}  ${C_WHITE}%-55s${R}${DIM} \u2026${R}" "$msg"
+            sleep 0.07
+            (( i++ )) || true
+        done
+    ) &
+    _SPIN_PID=$!
+    disown "$_SPIN_PID" 2>/dev/null || true
+}
+
+_spin_stop() {
+    [[ -n "$_SPIN_PID" ]] && kill "$_SPIN_PID" 2>/dev/null || true
+    _SPIN_PID=""
+}
+
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+#  run_step  \u2014 the main step runner
+#
+#  Usage:  run_step "Message" [--sudo] -- cmd [args...]
+#
+#  --sudo  wraps cmd in sudo automatically (for pacman etc.)
+#  On failure: shows captured output and returns 1 (caller can abort or skip)
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+STEP_PASS=0
+STEP_FAIL=0
+
+run_step() {
+    local msg="$1"; shift
+    local use_sudo=false
+
+    if [[ "${1:-}" == "--sudo" ]]; then
+        use_sudo=true
+        shift
+    fi
+    [[ "${1:-}" == "--" ]] && shift
+
+    local tmp
+    tmp=$(mktemp /tmp/arch-recovery-XXXXXX)
+
+    _spin_start "$msg"
+
+    local rc=0
+    if $use_sudo; then
+        sudo "$@" >"$tmp" 2>&1 || rc=$?
+    else
+        "$@" >"$tmp" 2>&1 || rc=$?
+    fi
+
+    _spin_stop
+
+    if [[ $rc -eq 0 ]]; then
+        printf "\r    ${C_GREEN}${BOLD}\u2714${R}  ${C_WHITE}%-55s${R}\n" "$msg"
+        (( STEP_PASS++ )) || true
+    else
+        printf "\r    ${C_RED}${BOLD}\u2718${R}  ${C_RED}%-55s${R}\n" "$msg"
+        echo -e "\n${DIM}\u250c\u2500 Error output \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510${R}"
+        sed 's/^/\u2502  /' "$tmp" | head -30
+        echo
